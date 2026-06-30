@@ -282,11 +282,25 @@
         window.addEventListener('touchend', handleEnd);
     });
 
+    // 初始化：優先嘗試載入同目錄下的預設圖片 IMG_8522.jpeg
     function initGame() {
-        createDefaultImage();
+        img = new Image();
+        img.onload = function() {
+            imgLoaded = true;
+            calculateImageCrop();
+            setupLevel();
+        };
+        img.onerror = function() {
+            // 如果讀取本地檔案失敗（例如因本地瀏覽器安全限制 CORS 阻擋），則自動使用彩色畫布作為備援背景
+            console.log("無法直接載入 IMG_8522.jpeg，啟動自動備援畫布。");
+            createDefaultImageFallback();
+        };
+        // 設定同目錄下的檔名
+        img.src = 'IMG_8522.jpeg';
     }
 
-    function createDefaultImage() {
+    // 自動備援背景生成器
+    function createDefaultImageFallback() {
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = 600;
         tempCanvas.height = 600;
@@ -299,18 +313,19 @@
         tCtx.fillRect(0, 0, 600, 600);
         
         tCtx.fillStyle = "rgba(255,255,255,0.3)";
-        tCtx.font = "bold 38px sans-serif";
+        tCtx.font = "bold 34px sans-serif";
         tCtx.textAlign = "center";
         tCtx.textBaseline = "middle";
         tCtx.fillText("請點擊下方上傳圖片遊玩", 300, 270);
         tCtx.fillText("𓃥", 300, 350);
 
-        img.src = tempCanvas.toDataURL();
+        img = new Image();
         img.onload = () => {
             imgLoaded = true;
             calculateImageCrop();
             setupLevel();
         };
+        img.src = tempCanvas.toDataURL();
     }
 
     function handleImageUpload(e) {
@@ -352,7 +367,6 @@
             `${mainDivisions} × ${subDivisions} (橫)` : 
             `${mainDivisions} × ${subDivisions} (縱)`;
 
-        // 調整核心：只有第 21 關或之後（currentLevel >= 21）才在面板上亮出限制提示
         if (currentLevel >= 21 && lastLevelSeconds !== null) {
             document.getElementById('lastRecordText').innerText = `≤ ${lastLevelSeconds} 秒`;
             document.getElementById('lastRecordDiv').style.color = '#e53e3e';
@@ -445,28 +459,6 @@
                 ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
             }
         }
-
-        drawMainCuts(viewSize, mainStep);
-    }
-
-    function drawMainCuts(size, mainStep) {
-        ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
-        ctx.lineWidth = 1; 
-        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
-        ctx.shadowBlur = 2; 
-        
-        for (let i = 1; i < mainDivisions; i++) {
-            ctx.beginPath();
-            if (isHorizontalSplit) {
-                ctx.moveTo(0, i * mainStep);
-                ctx.lineTo(size, i * mainStep);
-            } else {
-                ctx.moveTo(i * mainStep, 0);
-                ctx.lineTo(i * mainStep, size);
-            }
-            ctx.stroke();
-        }
-        ctx.shadowBlur = 0;
     }
 
     function handleStart(e) {
@@ -557,15 +549,12 @@
             clearInterval(timerInterval);
             
             setTimeout(() => {
-                // 核心調整：只有第 21 關開始（currentLevel >= 21）才對過關秒數做設限檢驗
                 if (currentLevel >= 21 && lastLevelSeconds !== null && totalSeconds > lastLevelSeconds) {
                     document.getElementById('gameOverReason').innerText = `💥 進入高難度挑戰失敗！自第 21 關起觸發設限條件。本關耗時 ${totalSeconds} 秒，慢於上一關（第 20 關）的紀錄 (${lastLevelSeconds} 秒)。`;
                     document.getElementById('gameOverModal').style.display = 'flex';
                 } else {
-                    // 成功過關（1~20 關內安全通關，或者 21 關後速度達標）
                     document.getElementById('winTimeText').innerText = `${totalSeconds} 秒`;
                     
-                    // 核心調整：只有第 21 關開始（currentLevel >= 21）才取消「沿用原圖」按鈕
                     const keepImgBtn = document.getElementById('nextKeepImgBtn');
                     if (currentLevel >= 21) {
                         keepImgBtn.style.display = 'none';
@@ -573,7 +562,6 @@
                         keepImgBtn.style.display = 'block';
                     }
                     
-                    // 覆寫上一關時間
                     lastLevelSeconds = totalSeconds;
                     document.getElementById('winModal').style.display = 'flex';
                 }
