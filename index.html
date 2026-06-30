@@ -1,1 +1,606 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>𓃥 白六滑動拼圖</title>
+    <style>
+        :root {
+            --primary-color: #4a90e2;
+            --bg-color: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-color: #333333;
+            --danger-color: #e53e3e;
+        }
 
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px 10px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 1.6rem;
+            margin-bottom: 15px;
+            color: #2c3e50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .status-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 15px;
+            background: #edf2f7;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: bold;
+        }
+
+        .status-row {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        /* 遊戲畫布容器 */
+        .game-box {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto 20px auto;
+            background: #e2e8f0;
+            border-radius: 8px;
+            overflow: hidden;
+            touch-action: none;
+            box-shadow: inset 0 2px 8px rgba(0,0,0,0.15);
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* 按鈕與上傳樣式 */
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            font-size: 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+
+        .btn:active {
+            background-color: #357abd;
+        }
+
+        .btn-secondary {
+            background-color: #718096;
+        }
+        .btn-secondary:active {
+            background-color: #4a5568;
+        }
+        
+        .btn-danger {
+            background-color: var(--danger-color);
+        }
+        .btn-danger:active {
+            background-color: #c53030;
+        }
+
+        #fileInput {
+            display: none;
+        }
+
+        /* 彈窗提示 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: 16px;
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .modal-content h2 {
+            color: #2f855a;
+            margin-bottom: 10px;
+        }
+        
+        .modal-content.game-over h2 {
+            color: var(--danger-color);
+        }
+
+        .modal-content p {
+            margin-bottom: 20px;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1><span>𓃥</span> 白六滑動拼圖</h1>
+    
+    <div class="status-panel">
+        <div class="status-row">
+            <div>關卡: <span id="levelText">1</span></div>
+            <div>時間: <span id="timerText">00:00</span></div>
+        </div>
+        <div class="status-row" style="margin-top: 4px;">
+            <div>切分: <span id="splitText">2 × 3</span></div>
+            <div id="lastRecordDiv">目標時間: <span id="lastRecordText">無限制</span></div>
+        </div>
+    </div>
+
+    <div class="game-box" id="gameBox">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div class="btn-group">
+        <label for="fileInput" class="btn btn-secondary">選擇或上傳新圖片</label>
+        <input type="file" id="fileInput" accept="image/*">
+        <button class="btn" id="resetBtn">重置本關</button>
+    </div>
+</div>
+
+<div class="modal" id="winModal">
+    <div class="modal-content">
+        <h2>🎉 恭喜過關！</h2>
+        <p>本關耗時：<span id="winTimeText">0 秒</span></p>
+        <div class="btn-group">
+            <button class="btn" id="nextKeepImgBtn">下一關 (沿用原圖)</button>
+            <button class="btn btn-secondary" id="nextChangeImgBtn">下一關 (換新圖片)</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="gameOverModal">
+    <div class="modal-content game-over">
+        <h2>💥 遊戲結束！</h2>
+        <p id="gameOverReason">本關耗時多於上一關的時間。</p>
+        <div class="btn-group">
+            <button class="btn btn-danger" id="restartGameBtn">重新挑戰第 1 關</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const gameBox = document.getElementById('gameBox');
+    
+    // 遊戲核心狀態
+    let currentLevel = 1;
+    let isHorizontalSplit = true; // true: 橫切(列滾動), false: 縱切(欄滾動)
+    let mainDivisions = 2; // 主切分數
+    let subDivisions = 3;  // 副切分數
+    
+    let img = new Image();
+    let imgLoaded = false;
+    
+    // 儲存圖片經等比裁切（Center Crop）後的正方形區塊坐標與大小
+    let cropX = 0, cropY = 0, cropSize = 0;
+    
+    // 記錄玩家各等份的邏輯滾動格數偏移量 (0 到 subDivisions-1)
+    let currentOffsets = []; 
+    
+    // 計時器與關卡限制變數
+    let startTime;
+    let timerInterval;
+    let totalSeconds = 0;
+    let lastLevelSeconds = null; // 上一關所花費的時間
+    let isLevelChanging = false; // 防止在過關延時期間重複觸發滑動
+
+    // 觸控與滑動操作變數
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let targetIndex = -1;    // 當前選中的主等份索引
+    let currentDragOffset = 0; // 當前滑動的即時像素位移量
+
+    // 初始化與事件綁定
+    window.addEventListener('DOMContentLoaded', () => {
+        initGame();
+        
+        document.getElementById('fileInput').addEventListener('change', handleImageUpload);
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            if (isLevelChanging) return;
+            scramblePuzzle();
+        });
+        
+        document.getElementById('nextKeepImgBtn').addEventListener('click', () => nextLevel());
+        document.getElementById('nextChangeImgBtn').addEventListener('click', () => {
+            document.getElementById('winModal').style.display = 'none';
+            document.getElementById('fileInput').click();
+        });
+        
+        document.getElementById('restartGameBtn').addEventListener('click', () => {
+            document.getElementById('gameOverModal').style.display = 'none';
+            currentLevel = 1;
+            lastLevelSeconds = null;
+            setupLevel();
+        });
+
+        // 滑鼠與觸控事件
+        gameBox.addEventListener('mousedown', handleStart);
+        gameBox.addEventListener('mousemove', handleMove);
+        window.addEventListener('mouseup', handleEnd);
+
+        gameBox.addEventListener('touchstart', handleStart, { passive: false });
+        gameBox.addEventListener('touchmove', handleMove, { passive: false });
+        window.addEventListener('touchend', handleEnd);
+    });
+
+    function initGame() {
+        createDefaultImage();
+    }
+
+    function createDefaultImage() {
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = 600;
+        tempCanvas.height = 600;
+        const tCtx = tempCanvas.getContext('2d');
+        
+        let gradient = tCtx.createLinearGradient(0, 0, 600, 600);
+        gradient.addColorStop(0, '#3a7bd5');
+        gradient.addColorStop(1, '#3a6073');
+        tCtx.fillStyle = gradient;
+        tCtx.fillRect(0, 0, 600, 600);
+        
+        tCtx.fillStyle = "rgba(255,255,255,0.3)";
+        tCtx.font = "bold 38px sans-serif";
+        tCtx.textAlign = "center";
+        tCtx.textBaseline = "middle";
+        tCtx.fillText("請點擊下方上傳圖片遊玩", 300, 270);
+        tCtx.fillText("𓃥", 300, 350);
+
+        img.src = tempCanvas.toDataURL();
+        img.onload = () => {
+            imgLoaded = true;
+            calculateImageCrop();
+            setupLevel();
+        };
+    }
+
+    function handleImageUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            img = new Image();
+            img.onload = function() {
+                imgLoaded = true;
+                document.getElementById('winModal').style.display = 'none';
+                document.getElementById('gameOverModal').style.display = 'none';
+                calculateImageCrop();
+                setupLevel();
+            }
+            img.src = event.target.result;
+        }
+        reader.readAsDataURL(file);
+    }
+
+    function calculateImageCrop() {
+        if (!imgLoaded) return;
+        const minDim = Math.min(img.width, img.height);
+        cropSize = minDim;
+        cropX = (img.width - minDim) / 2;
+        cropY = (img.height - minDim) / 2;
+    }
+
+    function setupLevel() {
+        isLevelChanging = false;
+        mainDivisions = currentLevel + 1;
+        subDivisions = currentLevel + 2;
+        
+        isHorizontalSplit = Math.random() < 0.5;
+
+        document.getElementById('levelText').innerText = currentLevel;
+        document.getElementById('splitText').innerText = isHorizontalSplit ? 
+            `${mainDivisions} × ${subDivisions} (橫)` : 
+            `${mainDivisions} × ${subDivisions} (縱)`;
+
+        // 調整核心：只有第 21 關或之後（currentLevel >= 21）才在面板上亮出限制提示
+        if (currentLevel >= 21 && lastLevelSeconds !== null) {
+            document.getElementById('lastRecordText').innerText = `≤ ${lastLevelSeconds} 秒`;
+            document.getElementById('lastRecordDiv').style.color = '#e53e3e';
+        } else {
+            document.getElementById('lastRecordText').innerText = "無限制";
+            document.getElementById('lastRecordDiv').style.color = 'inherit';
+        }
+
+        resizeCanvas();
+        scramblePuzzle();
+        startTimer();
+    }
+
+    function resizeCanvas() {
+        const rect = gameBox.getBoundingClientRect();
+        canvas.width = rect.width * window.devicePixelRatio;
+        canvas.height = rect.width * window.devicePixelRatio;
+        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    }
+
+    function scramblePuzzle() {
+        currentOffsets = [];
+        let allZero = true;
+        for (let i = 0; i < mainDivisions; i++) {
+            let randOffset = Math.floor(Math.random() * subDivisions);
+            currentOffsets.push(randOffset);
+            if (randOffset !== 0) allZero = false;
+        }
+        if (allZero) {
+            currentOffsets[0] = 1;
+        }
+        currentDragOffset = 0;
+        targetIndex = -1;
+        draw();
+    }
+
+    function draw() {
+        if (!imgLoaded) return;
+
+        const viewSize = canvas.width / window.devicePixelRatio;
+        ctx.clearRect(0, 0, viewSize, viewSize);
+
+        const mainStep = viewSize / mainDivisions;
+        const subStep = viewSize / subDivisions;
+
+        const imgMainStep = cropSize / mainDivisions;
+        const imgSubStep = cropSize / subDivisions;
+
+        for (let i = 0; i < mainDivisions; i++) {
+            let baseGridOffset = currentOffsets[i];
+            
+            let pixelOffset = 0;
+            if (isDragging && i === targetIndex) {
+                pixelOffset = currentDragOffset;
+            }
+
+            for (let j = -1; j <= subDivisions; j++) {
+                let origJ = (j - baseGridOffset) % subDivisions;
+                if (origJ < 0) origJ += subDivisions;
+
+                let sx, sy, sw, sh;
+                let dx, dy, dw, dh;
+
+                if (isHorizontalSplit) {
+                    sx = cropX + (origJ * imgSubStep);
+                    sy = cropY + (i * imgMainStep);
+                    sw = imgSubStep;
+                    sh = imgMainStep;
+
+                    dx = j * subStep + pixelOffset;
+                    dy = i * mainStep;
+                    dw = subStep;
+                    dh = mainStep;
+
+                    if (dx + dw < 0 || dx > viewSize) continue;
+                } else {
+                    sx = cropX + (i * imgMainStep);
+                    sy = cropY + (origJ * imgSubStep);
+                    sw = imgMainStep;
+                    sh = imgSubStep;
+
+                    dx = i * mainStep;
+                    dy = j * subStep + pixelOffset;
+                    dw = mainStep;
+                    dh = subStep;
+
+                    if (dy + dh < 0 || dy > viewSize) continue;
+                }
+
+                ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+            }
+        }
+
+        drawMainCuts(viewSize, mainStep);
+    }
+
+    function drawMainCuts(size, mainStep) {
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.85)";
+        ctx.lineWidth = 1; 
+        ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+        ctx.shadowBlur = 2; 
+        
+        for (let i = 1; i < mainDivisions; i++) {
+            ctx.beginPath();
+            if (isHorizontalSplit) {
+                ctx.moveTo(0, i * mainStep);
+                ctx.lineTo(size, i * mainStep);
+            } else {
+                ctx.moveTo(i * mainStep, 0);
+                ctx.lineTo(i * mainStep, size);
+            }
+            ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+    }
+
+    function handleStart(e) {
+        if (isLevelChanging) return; 
+        e.preventDefault();
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+        
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = clientX - rect.left;
+        const mouseY = clientY - rect.top;
+        
+        const viewSize = rect.width;
+        const mainStep = viewSize / mainDivisions;
+
+        startX = clientX;
+        startY = clientY;
+        isDragging = true;
+        currentDragOffset = 0;
+
+        if (isHorizontalSplit) {
+            targetIndex = Math.floor(mouseY / mainStep);
+        } else {
+            targetIndex = Math.floor(mouseX / mainStep);
+        }
+        
+        if (targetIndex < 0 || targetIndex >= mainDivisions) {
+            isDragging = false;
+        }
+    }
+
+    function handleMove(e) {
+        if (!isDragging || targetIndex === -1 || isLevelChanging) return;
+        e.preventDefault();
+
+        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+
+        const deltaX = clientX - startX;
+        const deltaY = clientY - startY;
+
+        if (isHorizontalSplit) {
+            currentDragOffset = deltaX;
+        } else {
+            currentDragOffset = deltaY;
+        }
+
+        draw();
+    }
+
+    function handleEnd() {
+        if (!isDragging || targetIndex === -1 || isLevelChanging) return;
+        isDragging = false;
+
+        const rect = canvas.getBoundingClientRect();
+        const viewSize = rect.width;
+        const subStep = viewSize / subDivisions;
+
+        const totalShiftGrids = currentDragOffset / subStep;
+        const sign = Math.sign(totalShiftGrids);
+        const absoluteShift = Math.abs(totalShiftGrids);
+
+        let gridMove = Math.floor(absoluteShift);
+        let remainder = absoluteShift - gridMove;
+
+        if (remainder >= 0.5) {
+            gridMove += 1;
+        }
+
+        const finalGridChange = gridMove * sign;
+
+        currentOffsets[targetIndex] = (currentOffsets[targetIndex] + finalGridChange) % subDivisions;
+        if (currentOffsets[targetIndex] < 0) {
+            currentOffsets[targetIndex] += subDivisions;
+        }
+
+        currentDragOffset = 0;
+        targetIndex = -1;
+        draw();
+
+        checkWinCondition();
+    }
+
+    function checkWinCondition() {
+        const isWin = currentOffsets.every(offset => offset === 0);
+        if (isWin) {
+            isLevelChanging = true; 
+            clearInterval(timerInterval);
+            
+            setTimeout(() => {
+                // 核心調整：只有第 21 關開始（currentLevel >= 21）才對過關秒數做設限檢驗
+                if (currentLevel >= 21 && lastLevelSeconds !== null && totalSeconds > lastLevelSeconds) {
+                    document.getElementById('gameOverReason').innerText = `💥 進入高難度挑戰失敗！自第 21 關起觸發設限條件。本關耗時 ${totalSeconds} 秒，慢於上一關（第 20 關）的紀錄 (${lastLevelSeconds} 秒)。`;
+                    document.getElementById('gameOverModal').style.display = 'flex';
+                } else {
+                    // 成功過關（1~20 關內安全通關，或者 21 關後速度達標）
+                    document.getElementById('winTimeText').innerText = `${totalSeconds} 秒`;
+                    
+                    // 核心調整：只有第 21 關開始（currentLevel >= 21）才取消「沿用原圖」按鈕
+                    const keepImgBtn = document.getElementById('nextKeepImgBtn');
+                    if (currentLevel >= 21) {
+                        keepImgBtn.style.display = 'none';
+                    } else {
+                        keepImgBtn.style.display = 'block';
+                    }
+                    
+                    // 覆寫上一關時間
+                    lastLevelSeconds = totalSeconds;
+                    document.getElementById('winModal').style.display = 'flex';
+                }
+            }, 1000);
+        }
+    }
+
+    function nextLevel() {
+        document.getElementById('winModal').style.display = 'none';
+        currentLevel++;
+        setupLevel();
+    }
+
+    function startTimer() {
+        clearInterval(timerInterval);
+        totalSeconds = 0;
+        document.getElementById('timerText').innerText = "00:00";
+        startTime = Date.now();
+        
+        timerInterval = setInterval(() => {
+            totalSeconds = Math.floor((Date.now() - startTime) / 1000);
+            const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+            const secs = String(totalSeconds % 60).padStart(2, '0');
+            document.getElementById('timerText').innerText = `${mins}:${secs}`;
+        }, 1000);
+    }
+</script>
+
+</body>
+</html>
